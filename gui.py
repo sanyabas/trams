@@ -129,8 +129,12 @@ class MapWidget(QWidget):
                 target_rect=QRect(column*self.tile_size,row*self.tile_size,self.tile_size,self.tile_size)
                 tile=self.mapper.get_tile_from_numbers(center_x+column,center_y+row,zoom)
                 painter.drawPixmap(target_rect,QPixmap(tile))
+
+    # def draw_far_tiles
                 
 
+    def outside_bounds(self, rect:QRect, bounds:QRect):
+        return rect.top()<0
 
 
 class DockWidget(QWidget):
