@@ -5,8 +5,8 @@ import math
 
 class MapReceiver:
     def __init__(self):
-        self.cache_dir='cache'
-        self.tile_server='http://a.tile2.opencyclemap.org/transport'
+        self.cache_dir = 'cache'
+        self.tile_server = 'http://a.tile2.opencyclemap.org/transport'
 
     def check_cache(self):
         if not os.path.exists(self.cache_dir):
@@ -14,8 +14,8 @@ class MapReceiver:
 
     def get_tile_from_coords(self, x, y, zoom):
         # self.check_cache()
-        x_tile,y_tile=self.coords_to_tile(x,y,zoom)
-        return self.get_tile_from_numbers(x_tile,y_tile,zoom)
+        x_tile, y_tile = self.coords_to_tile(x, y, zoom)
+        return self.get_tile_from_numbers(x_tile, y_tile, zoom)
         # tile_path = os.path.join(self.cache_dir, str(zoom), str(x_tile), str(y_tile)+'.png')
         # if not os.path.isfile(tile_path):
         #     self.create_subfolders(zoom,x_tile)
@@ -24,15 +24,15 @@ class MapReceiver:
         #         file.write(tile)
         # return tile_path
 
-    def get_tile_from_numbers(self,x,y,zoom):
+    def get_tile_from_numbers(self, x, y, zoom):
         self.check_cache()
-        tile_path=os.path.join(self.cache_dir, str(zoom), str(x), str(y)+'.png')
+        tile_path = os.path.join(self.cache_dir, str(zoom), str(x), str(y) + '.png')
         if not os.path.isfile(tile_path):
-            self.create_subfolders(zoom,x)
-            tile=self.request_tile(zoom,x,y)
-            with open(tile_path,'wb') as file:
+            self.create_subfolders(zoom, x)
+            tile = self.request_tile(zoom, x, y)
+            with open(tile_path, 'wb') as file:
                 file.write(tile)
-        return tile_path
+        return Tile(x,y,zoom,tile_path)
 
     def coords_to_tile(self, lat_deg, lon_deg, zoom):
         lat_rad = math.radians(lat_deg)
@@ -49,15 +49,29 @@ class MapReceiver:
         return lat_deg, lon_deg
 
     def request_tile(self, zoom, tile_x, tile_y):
-        url='{}/{}/{}/{}.png'.format(self.tile_server,zoom,tile_x,tile_y)
-        req=requests.get(url)
-        print(req.content)
+        url = '{}/{}/{}/{}.png'.format(self.tile_server, zoom, tile_x, tile_y)
+        req = requests.get(url)
         return req.content
 
     def create_subfolders(self, zoom, x):
-        zoom_path=os.path.join(self.cache_dir,str(zoom))
+        zoom_path = os.path.join(self.cache_dir, str(zoom))
         if not os.path.exists(zoom_path):
             os.mkdir(zoom_path)
-        x_path=os.path.join(zoom_path,str(x))
+        x_path = os.path.join(zoom_path, str(x))
         if not os.path.exists(x_path):
             os.mkdir(x_path)
+
+
+class Tile:
+    def __init__(self, x, y, zoom,path):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.zoom = zoom
+        self.path = path
+        self.corner = None
+
+    def __str__(self, *args, **kwargs):
+        return '{}:{},{}'.format(self.zoom,self.x,self.y)
+
+
