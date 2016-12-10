@@ -15,7 +15,7 @@ class MapReceiver:
     def get_tile_from_coords(self, x, y, zoom):
         # self.check_cache()
         x_tile,y_tile=self.coords_to_tile(x,y,zoom)
-        return self.get_tile_ftom_numbers(x_tile,y_tile,zoom)
+        return self.get_tile_from_numbers(x_tile,y_tile,zoom)
         # tile_path = os.path.join(self.cache_dir, str(zoom), str(x_tile), str(y_tile)+'.png')
         # if not os.path.isfile(tile_path):
         #     self.create_subfolders(zoom,x_tile)

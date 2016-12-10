@@ -53,6 +53,7 @@ class MapWidget(QWidget):
         QWidget.__init__(self)
         self.mapper = mapper
         self.tile_size=256
+        self.tile_drawn=[]
 
     def render_map(self, x, y, zoom):
         geom=self.geometry()
@@ -94,7 +95,9 @@ class MapWidget(QWidget):
         zoom = 15
         painter = QPainter()
         painter.begin(self)
-        self.draw_tiles_around_center(painter,x,y,zoom)
+        # self.draw_tiles_around_center(painter,x,y,zoom)
+        # self.draw_far_tiles(painter,x,y,zoom)
+        self.draw_tiles_from_corner(painter,x,y,zoom)
         # x, y = self.mapper.coords_to_tile(x, y, zoom)
         # tile = self.mapper.get_tile_from_numbers(x, y, zoom)
         # pixmap = QPixmap()
@@ -123,18 +126,59 @@ class MapWidget(QWidget):
     def draw_tiles_around_center(self,painter:QPainter,x,y,zoom):
         geom = self.geometry()
         painter.translate((geom.width()-self.tile_size)/2,(geom.height()-self.tile_size)/2)
+        translated_geom=QRect(-(geom.width()-self.tile_size)/2,-(geom.height()-self.tile_size)/2,geom.width(),geom.height())
         center_x,center_y=self.mapper.coords_to_tile(x,y,zoom)
         for row in range(-1,2):
             for column in range(-1,2):
                 target_rect=QRect(column*self.tile_size,row*self.tile_size,self.tile_size,self.tile_size)
+                self.tile_drawn.append(target_rect)
+                if self.outside_bounds(target_rect,translated_geom):
+                    continue
                 tile=self.mapper.get_tile_from_numbers(center_x+column,center_y+row,zoom)
                 painter.drawPixmap(target_rect,QPixmap(tile))
 
-    # def draw_far_tiles
+    def draw_far_tiles(self, painter:QPainter, x,y,zoom):
+        # painter.resetTransform()
+        top_drawn = min(self.tile_drawn, key=lambda rect:rect.top()).top()
+        left_drawn=min(self.tile_drawn, key=lambda rect:rect.left()).left()
+        right_drawn = max(self.tile_drawn, key=lambda rect:rect.right()).right()
+        bottom_drawn = max(self.tile_drawn, key=lambda rect:rect.bottom()).bottom()
+        geom=self.geometry()
+        start_x=0
+        start_y=0
+        # while start_x<geom.width():
+        center_x,center_y=self.mapper.coords_to_tile(x,y,zoom)
+        target_rect=QRect(start_x,start_y,left_drawn,top_drawn)
+        tile_rect=QRect(self.tile_size-left_drawn,self.tile_size-top_drawn,math.fabs(left_drawn),math.fabs(top_drawn))
+        tile=self.mapper.get_tile_from_numbers(center_x-2,center_y-2,zoom)
+        painter.drawPixmap(target_rect,QPixmap(tile),tile_rect)
+        start_x+=left_drawn
+
+    def draw_tiles_from_corner(self,painter:QPainter, x,y,zoom):
+        geom = self.geometry()
+        corner_x,corner_y=self.mapper.coords_to_tile(x,y,zoom)
+        row_number=0
+        for row in range(geom.top(),geom.height(),self.tile_size):
+            col_number=0
+            for column in range(geom.left(),geom.right(),self.tile_size):
+                target_rect=QRect(column,row,self.tile_size,self.tile_size)
+                tile_rect=QRect(0,0,self.tile_size,self.tile_size)
+                self.tile_drawn.append(target_rect)
+                if self.outside_bounds(target_rect,geom):
+                    height=geom.bottom()-row if row+self.tile_size>geom.bottom() else self.tile_size
+                    width = geom.right()-column if column+self.tile_size>geom.right() else self.tile_size
+                    target_rect=QRect(column,row,width,height)
+                    tile_rect=QRect(0,0,width,height)
+                res_x=corner_x+col_number
+                res_y=corner_y+row_number
+                tile=self.mapper.get_tile_from_numbers(res_x,res_y,zoom)
+                painter.drawPixmap(target_rect, QPixmap(tile),tile_rect)
+                col_number+=1
+            row_number+=1
                 
 
     def outside_bounds(self, rect:QRect, bounds:QRect):
-        return rect.top()<0
+        return rect.top()<bounds.top() or rect.bottom()>bounds.bottom() or rect.left()<bounds.left() or rect.right()>bounds.right()
 
 
 class DockWidget(QWidget):
