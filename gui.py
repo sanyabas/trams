@@ -1,6 +1,8 @@
 import sys
+
+import math
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtCore import QRect, QPoint
+from PyQt5.QtCore import QRect, QPoint, QRectF, QPointF
 from PyQt5.QtGui import QPainter
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QLabel, QMessageBox, QDialog, QMainWindow
@@ -24,9 +26,6 @@ class MainWidget(QMainWindow):
         self.zoom = 15
         self.render_map(self.x, self.y, self.zoom)
         self.dock_widget.show()
-        trammer = TransportReceiver()
-        trammer.get_trams()
-        trammer.get_trolleys()
 
     def init_ui(self):
         refresh_action = QtWidgets.QAction('&Refresh', self)
@@ -59,6 +58,13 @@ class MapWidget(QWidget):
         self.mapper = mapper
         self.tile_size = 256
         self.tile_drawn = []
+        self.left_top = QPointF(56.842963648401295, 60.6005859375)
+        self.zoom = 15
+        trammer = TransportReceiver()
+        # self.trams = trammer.get_trams()
+        self.trams = [Tram(14820819, '8', 56.91151, 60.59379)]
+        if self.tile_drawn:
+            self.draw_trams(self.trams)
 
     def render_map(self, x, y, zoom):
         geom = self.geometry()
@@ -130,6 +136,7 @@ class MapWidget(QWidget):
         print(self.tile_drawn)
         for i in self.tile_drawn:
             print(i.corner)
+        self.draw_trams(self.trams)
 
     def draw_tiles_around_center(self, painter: QPainter, x, y, zoom):
         geom = self.geometry()
@@ -189,6 +196,34 @@ class MapWidget(QWidget):
 
     def outside_bounds(self, rect: QRect, bounds: QRect):
         return rect.top() < bounds.top() or rect.bottom() > bounds.bottom() or rect.left() < bounds.left() or rect.right() > bounds.right()
+
+    def point_is_outside(self, point: QPointF, bounds: QRectF):
+        return point.x() < bounds.left() or point.x() > bounds.right() or point.y() < bounds.top() or point.y > bounds.bottom()
+
+    def draw_trams(self, trams):
+        geom = self.geometry()
+        last_tile = self.tile_drawn[-1]
+        right_bottom = self.mapper.tile_too_coords(last_tile.x + 1, last_tile.y + 1, self.zoom)
+        width = math.fabs(right_bottom[0] - self.left_top.x())
+        height = math.fabs(right_bottom[1] - self.left_top.y())
+        bounds = QRectF(self.left_top.x(), self.left_top.y(), width, height)
+        for tram in trams:
+            location = QPointF(tram.x, tram.y)
+            # if self.point_is_outside(location,bounds):
+            #     print(location)
+            #     continue
+
+    def count_tram_tile_coords(self, tram):
+        tile = self.mapper.coords_to_tile(tram.x, tram.y, self.zoom)
+        drawn_tile = self.find_tile(tile.x, tile.y)
+        dx = self.mapper.get_distance((tile.x, tile.y), (tram.x, tile.y))
+        dy = self.mapper.get_distance((tile.x, tile.y), (tile.x, tram.y))
+        # todo transform dx,dy to offset on a tile and draw
+
+    def find_tile(self, x, y):
+        for tile in self.tile_drawn:
+            if tile.x == x and tile.y == y:
+                return tile
 
 
 class DockWidget(QWidget):

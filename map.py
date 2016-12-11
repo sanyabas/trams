@@ -48,6 +48,18 @@ class MapReceiver:
         lat_deg = math.degrees(lat_rad)
         return lat_deg, lon_deg
 
+    def get_distance(self, point1, point2):
+        r=6371
+        lat_1,lon_1=point1
+        lat_2,lon_2=point2
+        lat_rad=math.radians(lat_2-lat_1)
+        lon_rad = math.radians(lon_2-lon_1)
+        lat_1=math.radians(lat_1)
+        lat_2=math.radians(lat_2)
+        a=math.sin(lat_rad/2)*math.sin(lat_rad/2)+math.sin(lon_rad/2)*math.sin(lon_rad/2)*math.cos(lat_1)*math.cos(lat_2)
+        c=math.atan2(math.sqrt(a),math.sqrt(1-a))
+        return r*c
+
     def request_tile(self, zoom, tile_x, tile_y):
         url = '{}/{}/{}/{}.png'.format(self.tile_server, zoom, tile_x, tile_y)
         req = requests.get(url)
