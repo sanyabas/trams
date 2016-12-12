@@ -32,7 +32,7 @@ class MapReceiver:
             tile = self.request_tile(zoom, x, y)
             with open(tile_path, 'wb') as file:
                 file.write(tile)
-        return Tile(x,y,zoom,tile_path)
+        return Tile(x, y, zoom, tile_path)
 
     def coords_to_tile(self, lat_deg, lon_deg, zoom):
         lat_rad = math.radians(lat_deg)
@@ -49,16 +49,20 @@ class MapReceiver:
         return lat_deg, lon_deg
 
     def get_distance(self, point1, point2):
-        r=6371
-        lat_1,lon_1=point1
-        lat_2,lon_2=point2
-        lat_rad=math.radians(lat_2-lat_1)
-        lon_rad = math.radians(lon_2-lon_1)
-        lat_1=math.radians(lat_1)
-        lat_2=math.radians(lat_2)
-        a=math.sin(lat_rad/2)*math.sin(lat_rad/2)+math.sin(lon_rad/2)*math.sin(lon_rad/2)*math.cos(lat_1)*math.cos(lat_2)
-        c=math.atan2(math.sqrt(a),math.sqrt(1-a))
-        return r*c
+        r = 6371
+        lat_1, lon_1 = point1
+        lat_2, lon_2 = point2
+        lat_rad = math.radians(lat_2 - lat_1)
+        lon_rad = math.radians(lon_2 - lon_1)
+        lat_1 = math.radians(lat_1)
+        lat_2 = math.radians(lat_2)
+        a = math.sin(lat_rad / 2) * math.sin(lat_rad / 2) + math.sin(lon_rad / 2) * math.sin(lon_rad / 2) * math.cos(
+            lat_1) * math.cos(lat_2)
+        c = 2*math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return r * c * 1000
+
+    def get_resolution(self,lat,zoom):
+        return 156543.03*math.cos(math.radians(lat))/(2**zoom)
 
     def request_tile(self, zoom, tile_x, tile_y):
         url = '{}/{}/{}/{}.png'.format(self.tile_server, zoom, tile_x, tile_y)
@@ -75,7 +79,7 @@ class MapReceiver:
 
 
 class Tile:
-    def __init__(self, x, y, zoom,path):
+    def __init__(self, x, y, zoom, path):
         super().__init__()
         self.x = x
         self.y = y
@@ -84,6 +88,4 @@ class Tile:
         self.corner = None
 
     def __str__(self, *args, **kwargs):
-        return '{}:{},{}'.format(self.zoom,self.x,self.y)
-
-
+        return '{}:{},{}'.format(self.zoom, self.x, self.y)
