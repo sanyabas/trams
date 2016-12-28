@@ -69,6 +69,7 @@ class MapWidget(QWidget):
         self.tile_start_x=256
         self.tile_start_y=256
         self.delta=QPoint(0,0)
+        self.to_rerender = False
         self.trammer = TransportReceiver()
         self.trams = self.trammer.get_trams()
 
@@ -93,7 +94,10 @@ class MapWidget(QWidget):
         zoom = 15
         painter = QPainter()
         painter.begin(self)
-        self.draw_tiles_from_corner(painter, self.lat, self.lon, zoom)
+        if self.to_rerender:
+            self.rerender(painter)
+        else:
+            self.draw_tiles_from_corner(painter, self.lat, self.lon, zoom)
         # self.draw_trams(self.trams, painter)
         painter.end()
         # print(self.tile_drawn)
@@ -108,7 +112,7 @@ class MapWidget(QWidget):
         for row in range(geom.top() - 256, geom.height(), self.tile_size):
             col_number = 0
             for column in range(geom.left() - 256, geom.right(), self.tile_size):
-                target_rect = QRect(column+self.delta.x(), row+self.delta.y(), self.tile_size, self.tile_size)
+                target_rect = QRect(column, row, self.tile_size, self.tile_size)
                 tile_rect = QRect(0, 0, self.tile_size, self.tile_size)
                 # if self.outside_bounds(target_rect, geom):
                 #     height = geom.bottom() - row if row + self.tile_size > geom.bottom() else self.tile_size
@@ -126,6 +130,65 @@ class MapWidget(QWidget):
                 tile.widget_y = target_rect.y()
                 col_number += 1
             row_number += 1
+
+    def rerender(self, painter: QPainter):
+        for tile in self.tile_drawn:
+            tile.widget_x += self.delta.x()
+            tile.widget_y += self.delta.y()
+            target_rect = QRectF(tile.widget_x, tile.widget_y, self.tile_size, self.tile_size)
+            tile_rect = QRectF(0, 0, self.tile_size, self.tile_size)
+            painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
+        self.fill_top_row(painter)
+        self.fill_bottom_row(painter)
+
+    def fill_top_row(self, painter: QPainter):
+        top_tile = min(self.tile_drawn, key=lambda tile: tile.widget_y)
+        if top_tile.widget_y > -256:
+            row = top_tile.widget_y - self.tile_size
+            col_number = 0
+            res_row = top_tile.y - 1
+            for column in range(int(top_tile.widget_x), self.geometry().width() + 1, self.tile_size):
+                res_col = top_tile.x + col_number
+                tile = self.mapper.get_tile_from_numbers(res_col, res_row, self.zoom)
+                target_rect = QRectF(column, row, self.tile_size, self.tile_size)
+                tile_rect = QRectF(0, 0, self.tile_size, self.tile_size)
+                self.tile_drawn.append(tile)
+                painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
+                tile.widget_x = target_rect.x()
+                tile.widget_y = target_rect.y()
+                col_number += 1
+        bottom_row = max(self.tile_drawn, key=lambda tile: tile.widget_y).widget_y
+        if bottom_row > self.geometry().height() + self.tile_size:
+            index = 0
+            while index < len(self.tile_drawn):
+                if self.tile_drawn[index].widget_y == bottom_row:
+                    self.tile_drawn.remove(self.tile_drawn[index])
+                index += 1
+
+    def fill_bottom_row(self, painter: QPainter):
+        top_tile = max(self.tile_drawn, key=lambda tile: tile.widget_y)
+        if top_tile.widget_y < self.geometry().height():
+            row = top_tile.widget_y + self.tile_size
+            col_number = 0
+            res_row = top_tile.y + 1
+            for column in range(int(top_tile.widget_x), self.geometry().width() + 1, self.tile_size):
+                res_col = top_tile.x + col_number
+                tile = self.mapper.get_tile_from_numbers(res_col, res_row, self.zoom)
+                target_rect = QRectF(column, row, self.tile_size, self.tile_size)
+                tile_rect = QRectF(0, 0, self.tile_size, self.tile_size)
+                self.tile_drawn.append(tile)
+                painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
+                tile.widget_x = target_rect.x()
+                tile.widget_y = target_rect.y()
+                col_number += 1
+        bottom_row = min(self.tile_drawn, key=lambda tile: tile.widget_y).widget_y
+        if bottom_row < -self.tile_size * 2:
+            index = 0
+            while index < len(self.tile_drawn):
+                if self.tile_drawn[index].widget_y == bottom_row:
+                    self.tile_drawn.remove(self.tile_drawn[index])
+                index += 1
+
 
     def draw_tiles(self,painter: QPainter, x, y, zoom):
         geom = self.geometry()
@@ -222,6 +285,7 @@ class MapWidget(QWidget):
         self.tile_start_x-=delta.x()
         self.tile_start_y-=delta.y()
         self.delta=delta
+        self.to_rerender = True
         self.update()
 
 
