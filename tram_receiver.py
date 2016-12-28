@@ -17,7 +17,7 @@ class TransportReceiver:
 
     def receive_transport(self, transport_type, routes):
         url = 'http://online.ettu.ru/map/getTrams/?p={},1,{}'.format(transport_type, ','.join(routes))
-        req = requests.get(url)
+        req = requests.get(url, timeout=1)
         dic = req.json()
         print(dic['T'])
         return dic['T']

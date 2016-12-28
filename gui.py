@@ -66,8 +66,9 @@ class MapWidget(QWidget):
         self.lat = 56.842963648401295
         self.lon = 60.6005859375
         self.zoom = 15
-        self.tile_start_x=0
-        self.tile_start_y=0
+        self.tile_start_x=256
+        self.tile_start_y=256
+        self.delta=QPoint(0,0)
         self.trammer = TransportReceiver()
         self.trams = self.trammer.get_trams()
 
@@ -100,13 +101,14 @@ class MapWidget(QWidget):
         #     print(i.corner)
 
     def draw_tiles_from_corner(self, painter: QPainter, x, y, zoom):
+        # return self.draw_tiles(painter,x,y,zoom)
         geom = self.geometry()
         corner_x, corner_y = self.mapper.coords_to_tile(x, y, zoom)
         row_number = 0
         for row in range(geom.top() - 256, geom.height(), self.tile_size):
             col_number = 0
             for column in range(geom.left() - 256, geom.right(), self.tile_size):
-                target_rect = QRect(column, row, self.tile_size, self.tile_size)
+                target_rect = QRect(column+self.delta.x(), row+self.delta.y(), self.tile_size, self.tile_size)
                 tile_rect = QRect(0, 0, self.tile_size, self.tile_size)
                 # if self.outside_bounds(target_rect, geom):
                 #     height = geom.bottom() - row if row + self.tile_size > geom.bottom() else self.tile_size
@@ -124,6 +126,31 @@ class MapWidget(QWidget):
                 tile.widget_y = target_rect.y()
                 col_number += 1
             row_number += 1
+
+    def draw_tiles(self,painter: QPainter, x, y, zoom):
+        geom = self.geometry()
+        corner_x, corner_y = self.mapper.coords_to_tile(x, y, zoom)
+        row_number = 0
+        row=-256
+        while row <= geom.height():
+            column=-256
+            col_number=0
+            while column<=geom.width():
+                tile_rect = QRect(self.tile_start_x%256, self.tile_start_y%256, self.tile_size-self.tile_start_x%256, self.tile_size-self.tile_start_y%256)
+                target_rect=QRect(column,row,(self.tile_size-self.tile_start_x%256),self.tile_size-self.tile_start_y%256)
+                res_x = corner_x + col_number
+                res_y = corner_y + row_number
+                tile = self.mapper.get_tile_from_numbers(res_x, res_y, zoom)
+                tile.corner = target_rect.topLeft()
+                self.tile_drawn.append(tile)
+                painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
+                tile.widget_x = target_rect.x()
+                tile.widget_y = target_rect.y()
+                col_number += 1
+                column+=(self.tile_size-self.tile_start_x%256)
+            row+=self.tile_size-self.tile_start_y%256
+            row_number += 1
+
 
     def outside_bounds(self, rect: QRect, bounds: QRect):
         return rect.top() < bounds.top() or rect.bottom() > bounds.bottom() or rect.left() < bounds.left() or rect.right() > bounds.right()
@@ -194,6 +221,7 @@ class MapWidget(QWidget):
         self.drag_start = self.current_pos
         self.tile_start_x-=delta.x()
         self.tile_start_y-=delta.y()
+        self.delta=delta
         self.update()
 
 
