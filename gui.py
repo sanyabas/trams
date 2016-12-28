@@ -24,6 +24,7 @@ class MainWidget(QMainWindow):
         self.x = 56.842963648401295
         self.y = 60.6005859375
         self.zoom = 15
+
         self.render_map(self.x, self.y, self.zoom)
         self.dock_widget.show()
 
@@ -61,8 +62,12 @@ class MapWidget(QWidget):
         self.mapper = mapper
         self.tile_size = 256
         self.tile_drawn = []
-        self.left_top = QPointF(60.6005859375,56.842963648401295)
+        self.left_top = QPointF(60.6005859375, 56.842963648401295)
+        self.lat = 56.842963648401295
+        self.lon = 60.6005859375
         self.zoom = 15
+        self.tile_start_x=0
+        self.tile_start_y=0
         self.trammer = TransportReceiver()
         self.trams = self.trammer.get_trams()
 
@@ -83,38 +88,40 @@ class MapWidget(QWidget):
         self.setLayout(self.layout)
 
     def paintEvent(self, e):
-        x = 56.842963648401295
-        y = 60.6005859375
+
         zoom = 15
         painter = QPainter()
         painter.begin(self)
-        self.draw_tiles_from_corner(painter, x, y, zoom)
-        self.draw_trams(self.trams, painter)
+        self.draw_tiles_from_corner(painter, self.lat, self.lon, zoom)
+        # self.draw_trams(self.trams, painter)
         painter.end()
-        print(self.tile_drawn)
-        for i in self.tile_drawn:
-            print(i.corner)
+        # print(self.tile_drawn)
+        # for i in self.tile_drawn:
+        #     print(i.corner)
 
     def draw_tiles_from_corner(self, painter: QPainter, x, y, zoom):
         geom = self.geometry()
         corner_x, corner_y = self.mapper.coords_to_tile(x, y, zoom)
         row_number = 0
-        for row in range(geom.top(), geom.height(), self.tile_size):
+        for row in range(geom.top() - 256, geom.height(), self.tile_size):
             col_number = 0
-            for column in range(geom.left(), geom.right(), self.tile_size):
+            for column in range(geom.left() - 256, geom.right(), self.tile_size):
                 target_rect = QRect(column, row, self.tile_size, self.tile_size)
                 tile_rect = QRect(0, 0, self.tile_size, self.tile_size)
-                if self.outside_bounds(target_rect, geom):
-                    height = geom.bottom() - row if row + self.tile_size > geom.bottom() else self.tile_size
-                    width = geom.right() - column if column + self.tile_size > geom.right() else self.tile_size
-                    target_rect = QRect(column, row, width, height)
-                    tile_rect = QRect(0, 0, width, height)
+                # if self.outside_bounds(target_rect, geom):
+                #     height = geom.bottom() - row if row + self.tile_size > geom.bottom() else self.tile_size
+                #     width = geom.right() - column if column + self.tile_size > geom.right() else self.tile_size
+                #     target_rect = QRect(column, row, width, height)
+                #     tile_rect = QRect(0, 0, width, height)
+
                 res_x = corner_x + col_number
                 res_y = corner_y + row_number
                 tile = self.mapper.get_tile_from_numbers(res_x, res_y, zoom)
                 tile.corner = target_rect.topLeft()
                 self.tile_drawn.append(tile)
                 painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
+                tile.widget_x = target_rect.x()
+                tile.widget_y = target_rect.y()
                 col_number += 1
             row_number += 1
 
@@ -124,46 +131,70 @@ class MapWidget(QWidget):
     def point_is_outside(self, point: QPointF, bounds: QRectF):
         return point.x() < bounds.left() or point.x() > bounds.right() or point.y() < bounds.top() or point.y() > bounds.bottom()
 
-    def draw_trams(self, trams, painter:QPainter):
-        trams=self.trammer.get_trams()
+    def draw_trams(self, trams, painter: QPainter):
+        trams = self.trammer.get_trams()
         geom = self.geometry()
         last_tile = self.tile_drawn[-1]
         right_bottom = self.mapper.tile_too_coords(last_tile.x + 1, last_tile.y + 1, self.zoom)
-        right_bottom=QPointF(right_bottom[1],right_bottom[0])
+        right_bottom = QPointF(right_bottom[1], right_bottom[0])
         width = math.fabs(right_bottom.x() - self.left_top.x())
         height = math.fabs(right_bottom.y() - self.left_top.y())
         bounds = QRectF(self.left_top.x(), right_bottom.y(), width, height)
         for tram in trams:
             location = QPointF(tram.lon, tram.lat)
-            if self.point_is_outside(location,bounds):
+            if self.point_is_outside(location, bounds):
                 continue
             print(location)
-            coords=self.count_tram_tile_coords(tram)
+            coords = self.count_tram_tile_coords(tram)
             if coords is not None:
-                x,y=coords
-                painter.setBrush(QColor(0,0,255))
-                painter.drawEllipse(x,y,10,10)
-                painter.drawText(x,y,tram.route)
+                x, y = coords
+                painter.setBrush(QColor(0, 0, 255))
+                painter.drawEllipse(x, y, 10, 10)
+                painter.drawText(x, y, tram.route)
 
     def count_tram_tile_coords(self, tram):
         tile = self.mapper.coords_to_tile(tram.lat, tram.lon, self.zoom)
         drawn_tile = self.find_tile(tile[0], tile[1])
         if drawn_tile is None:
             return
-        tile_lat,tile_lon=self.mapper.tile_too_coords(tile[0],tile[1],self.zoom)
+        tile_lat, tile_lon = self.mapper.tile_too_coords(tile[0], tile[1], self.zoom)
         dy = self.mapper.get_distance((tile_lat, tile_lon), (tram.lat, tile_lon))
         dx = self.mapper.get_distance((tile_lat, tile_lon), (tile_lat, tram.lon))
-        d=self.mapper.get_distance((tile_lat,tile_lon),(tram.lat,tram.lon))
-        resolution=self.mapper.get_resolution(tram.lat,self.zoom)
-        tile_dy=dy/resolution
-        tile_dx=dx/resolution
-        return drawn_tile.corner.x()+tile_dx,drawn_tile.corner.y()+tile_dy
+        d = self.mapper.get_distance((tile_lat, tile_lon), (tram.lat, tram.lon))
+        resolution = self.mapper.get_resolution(tram.lat, self.zoom)
+        tile_dy = dy / resolution
+        tile_dx = dx / resolution
+        return drawn_tile.corner.x() + tile_dx, drawn_tile.corner.y() + tile_dy
 
     def find_tile(self, x, y):
         for tile in self.tile_drawn:
             if tile.x == x and tile.y == y:
                 return tile
         return None
+
+    def find_tile_by_drawn_coords(self, x, y):
+        for tile in self.tile_drawn:
+            if x - tile.widget_x <= 256 and y - tile.widget_y <= 256:
+                return tile
+        return None
+
+    def mousePressEvent(self, event):
+        self.drag_start = event.localPos()
+
+    def mouseMoveEvent(self, event):
+        self.current_pos = event.localPos()
+        tile = self.find_tile_by_drawn_coords(self.current_pos.x(), self.current_pos.y())
+        delta = self.current_pos - self.drag_start
+        new_x, new_y = tile.x + delta.x() / 256, tile.y + delta.y() / 256
+        new_lat, new_lon = self.mapper.tile_too_coords(new_x, new_y, self.zoom)
+        old_lat, old_lon = self.mapper.tile_too_coords(tile.x, tile.y, self.zoom)
+        coords_delta = (new_lat - old_lat, new_lon - old_lon)
+        self.lat -= coords_delta[0]
+        self.lon -= coords_delta[1]
+        self.drag_start = self.current_pos
+        self.tile_start_x-=delta.x()
+        self.tile_start_y-=delta.y()
+        self.update()
 
 
 class DockWidget(QWidget):

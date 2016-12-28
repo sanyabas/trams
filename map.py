@@ -86,6 +86,8 @@ class Tile:
         self.zoom = zoom
         self.path = path
         self.corner = None
+        self.widget_x=0
+        self.widget_y=0
 
     def __str__(self, *args, **kwargs):
         return '{}:{},{}'.format(self.zoom, self.x, self.y)
