@@ -1,3 +1,5 @@
+import threading
+
 import requests
 import os.path
 import math
@@ -7,6 +9,7 @@ class MapReceiver:
     def __init__(self):
         self.cache_dir = 'cache'
         self.tile_server = 'http://a.tile2.opencyclemap.org/transport'
+        self.lock = threading.Lock()
 
     def check_cache(self):
         if not os.path.exists(self.cache_dir):
@@ -27,12 +30,18 @@ class MapReceiver:
     def get_tile_from_numbers(self, x, y, zoom):
         self.check_cache()
         tile_path = os.path.join(self.cache_dir, str(zoom), str(x), str(y) + '.png')
+        threading.Thread(target=self.check_and_request, args=(tile_path, x, y, zoom)).start()
+        # self.check_and_request(tile_path, x, y, zoom)
+        return Tile(x, y, zoom, tile_path)
+
+    def check_and_request(self, tile_path, x, y, zoom):
+        self.lock.acquire()
         if not os.path.isfile(tile_path):
             self.create_subfolders(zoom, x)
             tile = self.request_tile(zoom, x, y)
             with open(tile_path, 'wb') as file:
                 file.write(tile)
-        return Tile(x, y, zoom, tile_path)
+        self.lock.release()
 
     def coords_to_tile(self, lat_deg, lon_deg, zoom):
         lat_rad = math.radians(lat_deg)
