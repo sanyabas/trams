@@ -100,6 +100,7 @@ class MapWidget(QWidget):
             self.draw_tiles_from_corner(painter, self.lat, self.lon, zoom)
         # self.draw_trams(self.trams, painter)
         painter.end()
+        # print(len(self.tile_drawn))
         # print(self.tile_drawn)
         # for i in self.tile_drawn:
         #     print(i.corner)
@@ -140,9 +141,10 @@ class MapWidget(QWidget):
             painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
         self.fill_top_row(painter)
         self.fill_bottom_row(painter)
+        self.fill_left_column(painter)
 
     def fill_top_row(self, painter: QPainter):
-        top_tile = min(self.tile_drawn, key=lambda tile: tile.widget_y)
+        top_tile = min(self.get_tiles_on_screen(), key=lambda tile: tile.widget_y)
         if top_tile.widget_y > -256:
             row = top_tile.widget_y - self.tile_size
             col_number = 0
@@ -166,7 +168,7 @@ class MapWidget(QWidget):
                 index += 1
 
     def fill_bottom_row(self, painter: QPainter):
-        top_tile = max(self.tile_drawn, key=lambda tile: tile.widget_y)
+        top_tile = max(self.get_tiles_on_screen(), key=lambda tile: tile.widget_y)
         if top_tile.widget_y < self.geometry().height():
             row = top_tile.widget_y + self.tile_size
             col_number = 0
@@ -182,13 +184,36 @@ class MapWidget(QWidget):
                 tile.widget_y = target_rect.y()
                 col_number += 1
         bottom_row = min(self.tile_drawn, key=lambda tile: tile.widget_y).widget_y
-        if bottom_row < -self.tile_size * 2:
+        if bottom_row < -self.tile_size:
             index = 0
             while index < len(self.tile_drawn):
                 if self.tile_drawn[index].widget_y == bottom_row:
                     self.tile_drawn.remove(self.tile_drawn[index])
                 index += 1
 
+    def fill_left_column(self, painter: QPainter):
+        left_tile = min(self.get_tiles_on_screen(), key=lambda tile: tile.widget_x)
+        if left_tile.widget_x > -256:
+            column = left_tile.widget_x - self.tile_size
+            row_number = 0
+            res_col = left_tile.x - 1
+            for row in range(int(left_tile.widget_y), self.geometry().height() + 1, self.tile_size):
+                res_row = left_tile.y + row_number
+                tile = self.mapper.get_tile_from_numbers(res_col, res_row, self.zoom)
+                target_rect = QRectF(column, row, self.tile_size, self.tile_size)
+                tile_rect = QRectF(0, 0, self.tile_size, self.tile_size)
+                self.tile_drawn.append(tile)
+                painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
+                tile.widget_x = target_rect.x()
+                tile.widget_y = target_rect.y()
+                row_number += 1
+        right_column = max(self.tile_drawn, key=lambda tile: tile.widget_y).widget_x
+        if right_column > self.geometry().width() + self.tile_size:
+            index = 0
+            while index < len(self.tile_drawn):
+                if self.tile_drawn[index].widget_x == right_column:
+                    self.tile_drawn.remove(self.tile_drawn[index])
+                index += 1
 
     def draw_tiles(self,painter: QPainter, x, y, zoom):
         geom = self.geometry()
@@ -217,6 +242,11 @@ class MapWidget(QWidget):
 
     def outside_bounds(self, rect: QRect, bounds: QRect):
         return rect.top() < bounds.top() or rect.bottom() > bounds.bottom() or rect.left() < bounds.left() or rect.right() > bounds.right()
+
+    def get_tiles_on_screen(self):
+        return [tile for tile in self.tile_drawn if
+                not self.outside_bounds(QRect(tile.widget_x, tile.widget_y, self.tile_size, self.tile_size),
+                                        self.geometry())]
 
     def point_is_outside(self, point: QPointF, bounds: QRectF):
         return point.x() < bounds.left() or point.x() > bounds.right() or point.y() < bounds.top() or point.y() > bounds.bottom()
