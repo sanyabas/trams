@@ -13,16 +13,8 @@ class MapReceiver:
             os.makedirs(self.cache_dir)
 
     def get_tile_from_coords(self, x, y, zoom):
-        # self.check_cache()
         x_tile, y_tile = self.coords_to_tile(x, y, zoom)
         return self.get_tile_from_numbers(x_tile, y_tile, zoom)
-        # tile_path = os.path.join(self.cache_dir, str(zoom), str(x_tile), str(y_tile)+'.png')
-        # if not os.path.isfile(tile_path):
-        #     self.create_subfolders(zoom,x_tile)
-        #     tile=self.request_tile(zoom,x_tile,y_tile)
-        #     with open(tile_path,'wb') as file:
-        #         file.write(tile)
-        # return tile_path
 
     def get_tile_from_numbers(self, x, y, zoom):
         self.check_cache()
@@ -56,13 +48,13 @@ class MapReceiver:
         lon_rad = math.radians(lon_2 - lon_1)
         lat_1 = math.radians(lat_1)
         lat_2 = math.radians(lat_2)
-        a = math.sin(lat_rad / 2) * math.sin(lat_rad / 2) + math.sin(lon_rad / 2) * math.sin(lon_rad / 2) * math.cos(
-            lat_1) * math.cos(lat_2)
-        c = 2*math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        a = math.sin(lat_rad / 2) * math.sin(lat_rad / 2) + math.sin(lon_rad / 2) * math.sin(lon_rad / 2) \
+                                                            * math.cos(lat_1) * math.cos(lat_2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return r * c * 1000
 
-    def get_resolution(self,lat,zoom):
-        return 156543.03*math.cos(math.radians(lat))/(2**zoom)
+    def get_resolution(self, lat, zoom):
+        return 156543.03 * math.cos(math.radians(lat)) / (2 ** zoom)
 
     def request_tile(self, zoom, tile_x, tile_y):
         url = '{}/{}/{}/{}.png'.format(self.tile_server, zoom, tile_x, tile_y)
@@ -86,8 +78,8 @@ class Tile:
         self.zoom = zoom
         self.path = path
         self.corner = None
-        self.widget_x=0
-        self.widget_y=0
+        self.widget_x = 0
+        self.widget_y = 0
 
     def __str__(self, *args, **kwargs):
         return '{}:{},{}'.format(self.zoom, self.x, self.y)

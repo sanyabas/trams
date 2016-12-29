@@ -24,20 +24,20 @@ class TransportReceiver:
 
 
 class Transport:
-    def __init__(self, id, route, lat, lon, type):
+    def __init__(self, tram_id, route, lat, lon, transport_type):
         super().__init__()
-        self.id = id
+        self.id = tram_id
         self.route = route
-        self.type = type
+        self.type = transport_type
         self.lat = lat
         self.lon = lon
 
 
 class Tram(Transport):
-    def __init__(self, id, route, lat, lon):
-        super().__init__(id, route, lat, lon, 1)
+    def __init__(self, tram_id, route, lat, lon):
+        super().__init__(tram_id, route, lat, lon, 1)
 
 
 class Trolley(Transport):
-    def __init__(self, id, route, lat, lon):
-        super().__init__(id, route, lat, lon, 2)
+    def __init__(self, trolley_id, route, lat, lon):
+        super().__init__(trolley_id, route, lat, lon, 2)
