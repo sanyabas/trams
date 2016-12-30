@@ -1,4 +1,5 @@
 import sys
+import json
 
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import QRect, QPoint, QRectF, QPointF
@@ -18,6 +19,7 @@ class MainWidget(QMainWindow):
         self.dock_widget.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
         self.tram_routes = [str(i) for i in range(1, 35) if i not in [12, 28, 29, 30]]
         self.trolley_routes = [str(i) for i in range(1, 21) if i != 2]
+        self.settings_file = 'settings.json'
         self.init_ui()
         self.mapper = MapReceiver()
         self.x = 56.842963648401295
@@ -46,14 +48,21 @@ class MainWidget(QMainWindow):
         self.setWindowTitle("Где трамвай")
 
     def render_map(self, x, y, zoom):
-        self.setCentralWidget(MapWidget(self.mapper))
+        self.setCentralWidget(MapWidget(self.mapper, self.load_settings()))
 
     def draw_trams(self):
         self.centralWidget().update()
 
+    def closeEvent(self, e):
+        with open(self.settings_file, 'w') as file:
+            json.dump(self.centralWidget().get_settings(), file)
+
+    def load_settings(self):
+        with open(self.settings_file) as file:
+            return json.load(file)
 
 class MapWidget(QWidget):
-    def __init__(self, mapper: MapReceiver):
+    def __init__(self, mapper: MapReceiver, settings=None):
         QWidget.__init__(self)
         self.mapper = mapper
         self.tile_size = 256
@@ -64,9 +73,22 @@ class MapWidget(QWidget):
         self.zoom = 15
         self.delta = QPoint(0, 0)
         self.to_rerender = False
+        self.load_settings(settings)
         self.trammer = TransportReceiver()
         self.drag_start = None
         self.current_pos = None
+
+    def load_settings(self, settings):
+        if settings is None:
+            return
+        self.lat = settings['lat']
+        self.lon = settings['lon']
+
+    def get_settings(self):
+        return {
+            'lat': self.lat,
+            'lon': self.lon
+        }
 
     def paintEvent(self, e):
         zoom = 15
@@ -231,9 +253,9 @@ class MapWidget(QWidget):
         last_tile = self.tile_drawn[-1]
         right_bottom = self.mapper.tile_too_coords(last_tile.x + 1, last_tile.y + 1, self.zoom)
         right_bottom = QPointF(right_bottom[1], right_bottom[0])
-        width = math.fabs(right_bottom.x() - self.left_top.x())
-        height = math.fabs(right_bottom.y() - self.left_top.y())
-        bounds = QRectF(self.left_top.x(), right_bottom.y(), width, height)
+        width = math.fabs(right_bottom.x() - self.lon)
+        height = math.fabs(right_bottom.y() - self.lat)
+        bounds = QRectF(self.lon, right_bottom.y(), width, height)
         for tram in trams:
             location = QPointF(tram.lon, tram.lat)
             if self.point_is_outside(location, bounds):
