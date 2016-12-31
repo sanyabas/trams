@@ -1,6 +1,6 @@
 import sys
 import json
-
+import math
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import QRect, QPoint, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QColor
@@ -22,11 +22,7 @@ class MainWidget(QMainWindow):
         self.settings_file = 'settings.json'
         self.init_ui()
         self.mapper = MapReceiver()
-        self.x = 56.842963648401295
-        self.y = 60.6005859375
-        self.zoom = 15
-        self.render_map(self.x, self.y, self.zoom)
-        self.dock_widget.show()
+        self.render_map()
 
     def init_ui(self):
         refresh_action = QtWidgets.QAction('&Refresh', self)
@@ -35,7 +31,7 @@ class MainWidget(QMainWindow):
 
         close_action = QtWidgets.QAction("&Close", self)
         close_action.setShortcut("Ctrl+Q")
-        close_action.triggered.connect(lambda x: sys.exit())
+        close_action.triggered.connect(sys.exit)
 
         menu_bar = self.menuBar()
         menu_bar.addAction(close_action)
@@ -47,7 +43,7 @@ class MainWidget(QMainWindow):
 
         self.setWindowTitle("Где трамвай")
 
-    def render_map(self, x, y, zoom):
+    def render_map(self):
         self.setCentralWidget(MapWidget(self.mapper, self.load_settings()))
 
     def draw_trams(self):
@@ -61,13 +57,13 @@ class MainWidget(QMainWindow):
         with open(self.settings_file) as file:
             return json.load(file)
 
+
 class MapWidget(QWidget):
     def __init__(self, mapper: MapReceiver, settings=None):
         QWidget.__init__(self)
         self.mapper = mapper
         self.tile_size = 256
         self.tile_drawn = []
-        self.left_top = QPointF(60.6005859375, 56.842963648401295)
         self.lat = 56.842963648401295
         self.lon = 60.6005859375
         self.zoom = 15
@@ -94,11 +90,14 @@ class MapWidget(QWidget):
         zoom = 15
         painter = QPainter()
         painter.begin(self)
-        if self.to_rerender:
-            self.rerender(painter)
-        else:
-            self.draw_tiles_from_corner(painter, self.lat, self.lon, zoom)
-        self.draw_trams(painter)
+        try:
+            if self.to_rerender:
+                self.rerender(painter)
+            else:
+                self.draw_tiles_from_corner(painter, self.lat, self.lon, zoom)
+            self.draw_trams(painter)
+        except Exception as e:
+            print(e)
         painter.end()
 
     def draw_tiles_from_corner(self, painter: QPainter, x, y, zoom):
@@ -129,6 +128,7 @@ class MapWidget(QWidget):
             tile_rect = QRectF(0, 0, self.tile_size, self.tile_size)
             painter.drawPixmap(target_rect, QPixmap(tile.path), tile_rect)
         self.fill_perimeter(painter)
+        self.clear_tiles()
 
     def fill_perimeter(self, painter):
         self.fill_top_row(painter)
@@ -152,23 +152,15 @@ class MapWidget(QWidget):
                 tile.widget_x = target_rect.x()
                 tile.widget_y = target_rect.y()
                 col_number += 1
-        bottom_row = max(self.tile_drawn, key=lambda tile: tile.widget_y).widget_y
-        if bottom_row > self.geometry().height() + self.tile_size:
-            index = 0
-            while index < len(self.tile_drawn):
-                if self.tile_drawn[index].widget_y == bottom_row:
-                    self.tile_drawn.remove(self.tile_drawn[index])
-                else:
-                    index += 1
 
     def fill_bottom_row(self, painter: QPainter):
-        top_tile = max(self.get_tiles_on_screen(), key=lambda tile: tile.widget_y)
-        if top_tile.widget_y < self.geometry().height():
-            row = top_tile.widget_y + self.tile_size
+        bottom_tile = max(self.get_tiles_on_screen(), key=lambda cur_tile: cur_tile.widget_y)
+        if bottom_tile.widget_y < self.geometry().height():
+            row = bottom_tile.widget_y + self.tile_size
             col_number = 0
-            res_row = top_tile.y + 1
-            for column in range(int(top_tile.widget_x), self.geometry().width() + 1, self.tile_size):
-                res_col = top_tile.x + col_number
+            res_row = bottom_tile.y + 1
+            for column in range(int(bottom_tile.widget_x), self.geometry().width() + 1, self.tile_size):
+                res_col = bottom_tile.x + col_number
                 tile = self.mapper.get_tile_from_numbers(res_col, res_row, self.zoom)
                 target_rect = QRectF(column, row, self.tile_size, self.tile_size)
                 tile_rect = QRectF(0, 0, self.tile_size, self.tile_size)
@@ -177,14 +169,6 @@ class MapWidget(QWidget):
                 tile.widget_x = target_rect.x()
                 tile.widget_y = target_rect.y()
                 col_number += 1
-        bottom_row = min(self.tile_drawn, key=lambda tile: tile.widget_y).widget_y
-        if bottom_row < -self.tile_size:
-            index = 0
-            while index < len(self.tile_drawn):
-                if self.tile_drawn[index].widget_y == bottom_row:
-                    self.tile_drawn.remove(self.tile_drawn[index])
-                else:
-                    index += 1
 
     def fill_left_column(self, painter: QPainter):
         left_tile = min(self.get_tiles_on_screen(), key=lambda tile: tile.widget_x)
@@ -202,14 +186,6 @@ class MapWidget(QWidget):
                 tile.widget_x = target_rect.x()
                 tile.widget_y = target_rect.y()
                 row_number += 1
-        right_column = max(self.tile_drawn, key=lambda tile: tile.widget_y).widget_x
-        if right_column > self.geometry().width() + self.tile_size:
-            index = 0
-            while index < len(self.tile_drawn):
-                if self.tile_drawn[index].widget_x == right_column:
-                    self.tile_drawn.remove(self.tile_drawn[index])
-                else:
-                    index += 1
 
     def fill_right_column(self, painter: QPainter):
         right_tile = max(self.get_tiles_on_screen(), key=lambda tile: tile.widget_x)
@@ -227,17 +203,20 @@ class MapWidget(QWidget):
                 tile.widget_x = target_rect.x()
                 tile.widget_y = target_rect.y()
                 row_number += 1
-        left_column = max(self.tile_drawn, key=lambda tile: tile.widget_y).widget_x
-        if left_column < - self.tile_size:
-            index = 0
-            while index < len(self.tile_drawn):
-                if self.tile_drawn[index].widget_x == left_column:
-                    self.tile_drawn.remove(self.tile_drawn[index])
-                else:
-                    index += 1
+
+    def clear_tiles(self):
+        geom = self.geometry()
+        bounds = QRect(-self.tile_size, -self.tile_size, geom.width() + self.tile_size, geom.height() + self.tile_size)
+        tiles = [tile for tile in self.tile_drawn if
+                 self.fully_outside(QRect(tile.widget_x, tile.widget_y, self.tile_size, self.tile_size), bounds)]
+        for tile in tiles:
+            self.tile_drawn.remove(tile)
 
     def outside_bounds(self, rect: QRect, bounds: QRect):
         return rect.top() < bounds.top() or rect.bottom() > bounds.bottom() or rect.left() < bounds.left() or rect.right() > bounds.right()
+
+    def fully_outside(self, rect: QRect, bounds: QRect):
+        return rect.bottom() < bounds.top() or rect.right() < bounds.left() or rect.top() > bounds.bottom() or rect.left() > bounds.right()
 
     def get_tiles_on_screen(self):
         geom = self.geometry()
@@ -298,6 +277,8 @@ class MapWidget(QWidget):
     def mouseMoveEvent(self, event):
         self.current_pos = event.localPos()
         tile = self.find_tile_by_drawn_coords(self.current_pos.x(), self.current_pos.y())
+        if tile is None:
+            return
         delta = self.current_pos - self.drag_start
         new_x, new_y = tile.x + delta.x() / 256, tile.y + delta.y() / 256
         new_lat, new_lon = self.mapper.tile_too_coords(new_x, new_y, self.zoom)

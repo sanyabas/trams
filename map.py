@@ -83,3 +83,6 @@ class Tile:
 
     def __str__(self, *args, **kwargs):
         return '{}:{},{}'.format(self.zoom, self.x, self.y)
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
